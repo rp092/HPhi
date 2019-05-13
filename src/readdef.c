@@ -247,6 +247,7 @@ int ReadcalcmodFile(
   X->iOutputHam=0;
   X->iInputHam=0;
   X->iOutputExVec = 0;
+  X->iExByHam = 0;
   X->iFlgCalcSpec=0;
   X->iReStart=0;
   X->iFlgMPI=0;
@@ -297,6 +298,9 @@ int ReadcalcmodFile(
     }
     else if(CheckWords(ctmp, "OutputExcitedVec")==0|| CheckWords(ctmp, "OutputExVec")==0){
       X->iOutputExVec=itmp;
+    }
+    else if(CheckWords(ctmp, "ExByHam")==0){
+      X->iExByHam=itmp;
     }
     else if(CheckWords(ctmp, "CalcSpec")==0 || CheckWords(ctmp, "CalcSpectrum")==0){
       X->iFlgCalcSpec=itmp;

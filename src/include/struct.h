@@ -204,7 +204,7 @@ struct DefineList {
   int iOutputHam;/**<brief Switch for outputting a Hamiltonian. 0: no output, 1:output*/
   int iInputHam;/**<brief Switch for reading a Hamiltonian. 0: no input, 1:input*/
   int iOutputExVec; /**<brief Switch for outputting an excited vector. 0: no output, 1:output*/
-
+  int iExByHam;
     //[s] For Spectrum
   double complex dcOmegaMax;/**<@brief Upper limit of the frequency for the spectrum.*/
   double complex dcOmegaMin;/**<@brief Lower limit of the frequency for the spectrum.*/

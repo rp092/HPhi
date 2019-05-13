@@ -132,10 +132,13 @@ int CalcSpectrum(
   fprintf(stdoutMPI, "  Omega Min. : %15.5e %15.5e\n", creal(OmegaMin), cimag(OmegaMin));
   fprintf(stdoutMPI, "  Num. of Omega : %d\n", Nomega);
 
+  //TODO: Add flag to input excited vector or not
+  /*
   if (X->Bind.Def.NSingleExcitationOperator == 0 && X->Bind.Def.NPairExcitationOperator == 0) {
     fprintf(stderr, "Error: Any excitation operators are not defined.\n");
     exitMPI(-1);
   }
+  */
   //Make New Lists
   if (MakeExcitedList(&(X->Bind), &iFlagListModified) == FALSE) {
     return FALSE;
@@ -195,7 +198,8 @@ int CalcSpectrum(
     StopTimer(6102);
 
     //calculate norm
-    dnorm = NormMPI_dc(X->Bind.Check.idim_max, v0);
+      dnorm = NormMPI_dc(X->Bind.Check.idim_max, v0);
+
     if (fabs(dnorm) < pow(10.0, -15)) {
       fprintf(stderr, "Warning: Norm of an excited vector becomes 0.\n");
       fprintf(stdoutMPI, "  End:   Calculating an excited vector.\n\n");
@@ -216,7 +220,7 @@ int CalcSpectrum(
 
     //Output excited vector
     if (X->Bind.Def.iOutputExVec == 1) {
-      fprintf(stdoutMPI, "  Start:   Output an excited vector.\n\n");
+      fprintf(stdoutMPI, "  Start:   Output an excited vector.\n");
       sprintf(sdt, cFileNameOutputExcitedVec, X->Bind.Def.CDataFileHead, myrank);
       if(childfopenALL(sdt, "w", &fp)!=0){
         return -1;
@@ -226,7 +230,18 @@ int CalcSpectrum(
         fprintf(fp, "%.10lf, %.10lf\n", creal(v0[i]), cimag(v0[i]));
       }
       fclose(fp);
+
+      sprintf(sdt, "excited_vec_rank_%d.dat", myrank);
+      if(childfopenALL(sdt, "wb", &fp)!=0){
+        exitMPI(-1);
+      }
+      fwrite(&X->Bind.Large.itr, sizeof(X->Bind.Large.itr),1,fp);
+      fwrite(&X->Bind.Check.idim_max, sizeof(X->Bind.Check.idim_max),1,fp);
+      fwrite(v0, sizeof(complex double),X->Bind.Check.idim_max+1, fp);
+      fclose(fp);
+      TimeKeeper(&(X->Bind), cFileNameTimeKeep, cOutputEigenVecFinish, "a");
       fprintf(stdoutMPI, "  End:   Output an excited vector.\n\n");
+      return TRUE;
     }
 
     fprintf(stdoutMPI, "  End:   Calculating an excited vector.\n\n");
@@ -319,22 +334,33 @@ int GetExcitedState
  double complex *tmp_v1
 )
 {
-   if(X->Def.NSingleExcitationOperator > 0 && X->Def.NPairExcitationOperator > 0){
-    fprintf(stderr, "Error: Both single and pair excitation operators exist.\n");
-    return FALSE;
-    }
+   if (X->Def.iExByHam == 0) {
+     if(X->Def.NSingleExcitationOperator > 0 && X->Def.NPairExcitationOperator > 0){
+       fprintf(stderr, "Error: Both single and pair excitation operators exist.\n");
+       return FALSE;
+     }
+     if (X->Def.NSingleExcitationOperator > 0) {
+       if (GetSingleExcitedState(X, tmp_v0, tmp_v1) != TRUE) {
+         return FALSE;
+       }
+     } else if (X->Def.NPairExcitationOperator > 0) {
+       if (GetPairExcitedState(X, tmp_v0, tmp_v1) != TRUE) {
+         return FALSE;
+       }
+     } else {
+       unsigned int i;
+       for (i = 0; i < X->Check.idim_max; i++) tmp_v0[i] = tmp_v1[i];
+     }
+   }
+   else{
+     diagonalcalc(X);
+     mltply(X, tmp_v0, tmp_v1);
+     complex double dam_pr =0;
+     unsigned int i;
+     for (i = 0; i < X->Check.idim_max; i++) dam_pr += conj(tmp_v0[i])*tmp_v1[i];
 
-
-    if(X->Def.NSingleExcitationOperator > 0){
-      if(GetSingleExcitedState(X,tmp_v0, tmp_v1)!=TRUE){
-        return FALSE;
-      }
-    }
-    else if(X->Def.NPairExcitationOperator >0){
-      if(GetPairExcitedState(X,tmp_v0, tmp_v1)!=TRUE){
-        return FALSE;
-      }
-    }
+     return TRUE;
+   }
 
   return TRUE;
 }
@@ -476,7 +502,7 @@ int MakeExcitedList(
                 break;
         }
     } else {
-        return FALSE;
+        *iFlgListModifed = FALSE;
     }
 
     if (*iFlgListModifed == TRUE) {
